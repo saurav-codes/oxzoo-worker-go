@@ -1,0 +1,20 @@
+# ox deploy manifest for oxzoo-worker-go: an internal worker with no web
+# surface. ox runs it as a systemd service with Restart=always; output is
+# verified through journalctl, and GREETING_TAG arrives as runtime env.
+
+name = "oxzoo-worker-go"
+branch = "main"
+runtime = "go"
+framework = "generic"
+package_manager = ""
+port = 9119
+environment_file = "/etc/ox/apps/oxzoo-worker-go.env"
+required_packages = ["go"]
+
+[[processes]]
+name = "worker"
+command = "./worker"
+restart_policy = "always"
+
+[deploy]
+install = ["go build -o worker ./cmd/worker"]
