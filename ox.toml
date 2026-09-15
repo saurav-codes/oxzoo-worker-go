@@ -8,7 +8,7 @@ runtime = "go"
 framework = "generic"
 package_manager = ""
 port = 9119
-environment_file = "/etc/ox/apps/oxzoo-worker-go.env"
+environment_file = "/etc/ox/projects/oxzoo-worker-go.env"
 required_packages = ["go"]
 
 [[processes]]
