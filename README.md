@@ -1,6 +1,8 @@
 # oxzoo-worker-go
 
-An official ox deploy example: an internal Go background worker built with the standard library only, deployed to a single Ubuntu VPS by the [ox](https://github.com/saurav-codes/vps-ctl) control plane from one `ox.toml` manifest at the repo root. There is no domain, no nginx routing, and no HTTP server; the journal is the product. ox compiles `./worker` with the Go toolchain installed from apt, runs it as a systemd process with `Restart=always`, and the printed stdout lines land in that unit's journal, where `journalctl` reads them back.
+Deployed with [ox](https://deploywithox.com): deploy a repo to your own server with one command, no Docker. [Docs](https://deploywithox.com/docs) · [Stack guides](https://deploywithox.com/docs/guides)
+
+An official ox deploy example: an internal Go background worker built with the standard library only, deployed to a single Ubuntu VPS by the [ox](https://deploywithox.com) control plane from one `ox.toml` manifest at the repo root. There is no domain, no nginx routing, and no HTTP server; the journal is the product. ox compiles `./worker` with the Go toolchain installed from apt, runs it as a systemd process with `Restart=always`, and the printed stdout lines land in that unit's journal, where `journalctl` reads them back.
 
 ## Stack
 
