@@ -1,6 +1,6 @@
 // Command worker prints the oxzoo greeting line to stdout every 10 seconds,
-// forever. ox runs it as a systemd process with Restart=always and reads its
-// journal to verify output; it opens no network socket.
+// forever. ox runs it as a systemd worker that restarts if it exits, and its
+// lines show in ox logs; it opens no network socket.
 package main
 
 import (

@@ -2,53 +2,73 @@
 
 Deployed with [ox](https://deploywithox.com): deploy a repo to your own server with one command, no Docker. [Docs](https://deploywithox.com/docs) · [Stack guides](https://deploywithox.com/docs/guides)
 
-An official ox deploy example: an internal Go background worker built with the standard library only, deployed to a single Ubuntu VPS by the [ox](https://deploywithox.com) control plane from one `ox.toml` manifest at the repo root. There is no domain, no nginx routing, and no HTTP server; the journal is the product. ox compiles `./worker` with the Go toolchain installed from apt, runs it as a systemd process with `Restart=always`, and the printed stdout lines land in that unit's journal, where `journalctl` reads them back.
+An [ox](https://deploywithox.com) deploy example: an internal Go background worker built with the standard library only, deployed to your own Ubuntu server. There is no domain and no HTTP server; the logs are the product. ox builds `./worker` and runs it under systemd as a worker that restarts if it exits.
 
 ## Stack
 
 | Component | Version | Purpose |
 |---|---|---|
-| Worker | Go 1.24 (`go.mod` directive), standard library only (`os`, `fmt`, `time`) | Prints `hello world oxzoo-worker-go_<GREETING_TAG>` to stdout every 10 seconds |
-| Build | apt `go` toolchain, pulled by `required_packages = ["go"]` | Runs `go build -o worker ./cmd/worker` as the deploy install hook |
-| Process | systemd via ox, `restart_policy = "always"` | Keeps `./worker` alive and restarts it if it exits |
-| Deploy | ox | `ox.toml` defines the process and install hook |
+| Worker | Go 1.24 (from `go.mod`), standard library only | prints `hello world oxzoo-worker-go_<GREETING_TAG>` every 10 seconds |
+| Toolchain | Go from `go.mod`, installed by ox with mise | builds `./worker` |
+
+## ox.toml
+
+```toml
+# A Go background worker: no web process, no domain.
+
+[app]
+enabled = false
+
+[workers]
+worker = "./worker"
+
+[build]
+commands = ["go build -o worker ./cmd/worker"]
+```
+
+`[app] enabled = false` says the project has no web process, so ox adds none and asks for no domain.
 
 ## Environment flow
 
-One variable, one path:
-
-**`GREETING_TAG`** — `cmd/worker/main.go` reads it once at startup with `os.Getenv("GREETING_TAG")`. If it is missing, the worker prints a clear error to stderr and exits 1, so a misconfigured deploy fails loudly instead of looping with an empty tag. With the value set, every line printed to stdout carries it, and a restart with a new value changes every line from then on. `GREETING_TAG` arrives as runtime env from the ox Environment editor (the project env file `/srv/ox/oxzoo-worker-go/env`, merged into the process at deploy); `.env.example` documents the variable with a placeholder, and real values live in the ox dashboard, never in git.
-
-The `port = 9119` in `ox.toml` is declared because ox requires a project port even for non-listening workers; this worker never opens a socket, so nothing listens there.
+`cmd/worker/main.go` reads `GREETING_TAG` once at startup. If it is missing, the worker prints an error and exits 1, so a misconfigured deploy fails loudly instead of looping with an empty tag. Changing it with `ox vars set` redeploys, and the next lines carry the new value.
 
 ## Deploy with ox
 
-1. Add the repo in the ox dashboard: paste the clone URL `git@github.com:saurav-codes/oxzoo-worker-go`.
-2. In the Environment editor, set `GREETING_TAG=w3-05`.
-3. Press **Deploy**. ox runs `go build -o worker ./cmd/worker` in the release worktree, injects `GREETING_TAG` as runtime env, and starts `./worker` under systemd with `Restart=always`. No domain is needed at any step.
+```sh
+curl -fsSL https://deploywithox.com/install.sh | sh
+ox login
+ox new https://github.com/saurav-codes/oxzoo-worker-go
+printf 'GREETING_TAG=demo\n' | ox review oxzoo-worker-go --from-file - --wait
+```
+
+The plan, offline:
+
+```console
+$ ox check .
+ox check . (manifest: ox.toml)
+
+  build.commands[0]          go build -o worker ./cmd/worker                      declared
+  workers.worker             ./worker                                             declared
+  tools.go                   1.24                                                 detected:go.mod
+
+  Provided by ox: PORT, HOST, OX_ENV, OX_PROJECT, OX_RELEASE, OX_DATA_DIR
+  Set on the dashboard before the first deploy: GREETING_TAG
+  hint: [build] commands replaces the detected build step "go build -o .ox/bin/app ./cmd/worker" (from go.mod); add it to the list if the release still needs it
+
+Ready to deploy.
+```
 
 ## Expected output
 
-Follow the worker's journal on the host:
-
-```bash
-journalctl -u ox-oxzoo-worker-go-worker.service
+```sh
+ox logs oxzoo-worker-go --follow
 ```
 
-With `GREETING_TAG=w3-05` set in the Environment editor, the journal shows the exact line `hello world oxzoo-worker-go_w3-05`, repeating every 10 seconds:
-
-```
-hello world oxzoo-worker-go_w3-05
-hello world oxzoo-worker-go_w3-05
-```
-
-Unit name anatomy: ox names every process unit `ox-<project>-<process>.service`. The project name is `oxzoo-worker-go` and the `[[processes]]` entry is `worker`, so the unit is `ox-oxzoo-worker-go-worker.service`. If the worker exits, systemd restarts it per `restart_policy = "always"` and the restarts show up inline in the same journal.
+shows `hello world oxzoo-worker-go_<GREETING_TAG>` every 10 seconds.
 
 ## Local development
 
-```bash
+```sh
 go build -o worker ./cmd/worker
 GREETING_TAG=dev ./worker
 ```
-
-Without `GREETING_TAG` the worker exits 1 with an error on stderr instead of printing. Pass env inline per the commands above; never commit a real `.env`.
